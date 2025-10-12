@@ -2,23 +2,21 @@ import { StatsCard } from "@/components/StatsCard";
 import { VehicleCard } from "@/components/VehicleCard";
 import { AlertCard } from "@/components/AlertCard";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { 
   Car, 
   Users, 
   Wrench, 
-  AlertTriangle, 
-  TrendingUp,
+  AlertTriangle,
   Fuel,
   Calendar,
-  Plus,
-  Search,
-  Bell
+  TrendingUp,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Index = () => {
-  // Mock data - À remplacer par des données réelles plus tard
+  const navigate = useNavigate();
+
   const stats = [
     {
       title: "Véhicules actifs",
@@ -108,136 +106,115 @@ const Index = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="gradient-primary rounded-xl p-2.5 shadow-glow">
-                <Car className="h-7 w-7 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">FleetManager Pro</h1>
-                <p className="text-sm text-muted-foreground">Gestion intelligente de flotte</p>
-              </div>
+    <div className="container mx-auto px-4 py-8 space-y-8">
+      {/* Stats Grid */}
+      <section>
+        <div className="mb-4">
+          <h2 className="text-2xl font-bold">Vue d'ensemble</h2>
+          <p className="text-muted-foreground">Statistiques en temps réel de votre flotte</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat, index) => (
+            <StatsCard key={index} {...stat} />
+          ))}
+        </div>
+      </section>
+
+      {/* Quick Actions */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card 
+          className="p-6 hover:shadow-lg transition-all cursor-pointer border-border hover:border-accent/50"
+          onClick={() => navigate('/fuel')}
+        >
+          <div className="flex items-center gap-4">
+            <div className="rounded-lg bg-success/10 p-3">
+              <Fuel className="h-6 w-6 text-success" />
             </div>
-            <div className="flex items-center gap-3">
-              <Button variant="outline" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] text-white flex items-center justify-center">
-                  3
-                </span>
-              </Button>
-              <Button className="gradient-primary border-0">
-                <Plus className="h-4 w-4 mr-2" />
-                Nouveau véhicule
-              </Button>
+            <div>
+              <h3 className="font-semibold">Gestion carburant</h3>
+              <p className="text-sm text-muted-foreground">Suivi et analyse</p>
             </div>
           </div>
-        </div>
-      </header>
+        </Card>
 
-      <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Stats Grid */}
-        <section>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {stats.map((stat, index) => (
-              <StatsCard key={index} {...stat} />
+        <Card 
+          className="p-6 hover:shadow-lg transition-all cursor-pointer border-border hover:border-primary/50"
+          onClick={() => navigate('/tours')}
+        >
+          <div className="flex items-center gap-4">
+            <div className="rounded-lg bg-primary/10 p-3">
+              <Calendar className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Planning</h3>
+              <p className="text-sm text-muted-foreground">Tournées & missions</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card 
+          className="p-6 hover:shadow-lg transition-all cursor-pointer border-border hover:border-warning/50"
+          onClick={() => navigate('/reports')}
+        >
+          <div className="flex items-center gap-4">
+            <div className="rounded-lg bg-warning/10 p-3">
+              <TrendingUp className="h-6 w-6 text-warning" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Rapports</h3>
+              <p className="text-sm text-muted-foreground">Analytics & stats</p>
+            </div>
+          </div>
+        </Card>
+      </section>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Vehicles Section */}
+        <section className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">Véhicules récents</h2>
+              <p className="text-sm text-muted-foreground">Aperçu de votre flotte</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            {vehicles.map((vehicle) => (
+              <VehicleCard 
+                key={vehicle.id} 
+                vehicle={vehicle}
+                onClick={() => navigate('/vehicles')}
+              />
             ))}
           </div>
+
+          <Button 
+            variant="outline" 
+            className="w-full"
+            onClick={() => navigate('/vehicles')}
+          >
+            Voir tous les véhicules (42)
+          </Button>
         </section>
 
-        {/* Quick Actions */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer border-border">
-            <div className="flex items-center gap-4">
-              <div className="rounded-lg bg-success/10 p-3">
-                <Fuel className="h-6 w-6 text-success" />
-              </div>
-              <div>
-                <h3 className="font-semibold">Gestion carburant</h3>
-                <p className="text-sm text-muted-foreground">Suivi et analyse</p>
-              </div>
-            </div>
-          </Card>
+        {/* Alerts Sidebar */}
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-2xl font-bold">Alertes récentes</h2>
+            <p className="text-sm text-muted-foreground">Notifications importantes</p>
+          </div>
 
-          <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer border-border">
-            <div className="flex items-center gap-4">
-              <div className="rounded-lg bg-primary/10 p-3">
-                <Calendar className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold">Planning</h3>
-                <p className="text-sm text-muted-foreground">Tournées & missions</p>
-              </div>
-            </div>
-          </Card>
+          <div className="space-y-3">
+            {alerts.map((alert) => (
+              <AlertCard key={alert.id} alert={alert} />
+            ))}
+          </div>
 
-          <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer border-border">
-            <div className="flex items-center gap-4">
-              <div className="rounded-lg bg-warning/10 p-3">
-                <TrendingUp className="h-6 w-6 text-warning" />
-              </div>
-              <div>
-                <h3 className="font-semibold">Rapports</h3>
-                <p className="text-sm text-muted-foreground">Analytics & stats</p>
-              </div>
-            </div>
-          </Card>
+          <Button variant="outline" className="w-full">
+            Voir toutes les alertes
+          </Button>
         </section>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Vehicles Section */}
-          <section className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold">Véhicules</h2>
-                <p className="text-sm text-muted-foreground">Gestion et suivi de votre flotte</p>
-              </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Rechercher un véhicule..." 
-                  className="pl-10 w-64"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4">
-              {vehicles.map((vehicle) => (
-                <VehicleCard 
-                  key={vehicle.id} 
-                  vehicle={vehicle}
-                  onClick={() => console.log(`Voir détails: ${vehicle.id}`)}
-                />
-              ))}
-            </div>
-
-            <Button variant="outline" className="w-full">
-              Voir tous les véhicules ({42})
-            </Button>
-          </section>
-
-          {/* Alerts Sidebar */}
-          <section className="space-y-4">
-            <div>
-              <h2 className="text-2xl font-bold">Alertes récentes</h2>
-              <p className="text-sm text-muted-foreground">Notifications importantes</p>
-            </div>
-
-            <div className="space-y-3">
-              {alerts.map((alert) => (
-                <AlertCard key={alert.id} alert={alert} />
-              ))}
-            </div>
-
-            <Button variant="outline" className="w-full">
-              Voir toutes les alertes
-            </Button>
-          </section>
-        </div>
-      </main>
+      </div>
     </div>
   );
 };
