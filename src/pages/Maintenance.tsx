@@ -3,16 +3,17 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Wrench, AlertTriangle, CheckCircle, Trash2 } from "lucide-react";
+import { Calendar, Wrench, AlertTriangle, CheckCircle, Trash2, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { MaintenanceDialog } from "@/components/MaintenanceDialog";
 
 const Maintenance = () => {
-  const { toast } = useToast();
   const [maintenance, setMaintenance] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedMaintenance, setSelectedMaintenance] = useState<any>(null);
 
   useEffect(() => {
     fetchData();
@@ -27,18 +28,14 @@ const Maintenance = () => {
             *,
             vehicles (brand, model, plate)
           `)
-          .order("date", { ascending: true }),
-        supabase.from("vehicles").select("*"),
+          .order("date", { ascending: false }),
+        supabase.from("vehicles").select("*").order("brand"),
       ]);
 
       if (maintenanceData) setMaintenance(maintenanceData);
       if (vehiclesData) setVehicles(vehiclesData);
     } catch (error: any) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de charger les données",
-        variant: "destructive",
-      });
+      toast.error("Impossible de charger les données");
     } finally {
       setLoading(false);
     }
@@ -55,19 +52,21 @@ const Maintenance = () => {
 
       if (error) throw error;
 
-      toast({
-        title: "Supprimé",
-        description: "L'enregistrement a été supprimé",
-      });
-
+      toast.success("Enregistrement supprimé");
       fetchData();
     } catch (error: any) {
-      toast({
-        title: "Erreur",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(error.message);
     }
+  };
+
+  const handleEdit = (item: any) => {
+    setSelectedMaintenance(item);
+    setDialogOpen(true);
+  };
+
+  const handleAdd = () => {
+    setSelectedMaintenance(null);
+    setDialogOpen(true);
   };
 
   const scheduledMaintenance = maintenance.filter((m) => m.status !== "completed");
@@ -95,7 +94,10 @@ const Maintenance = () => {
             Planifiez et suivez les interventions
           </p>
         </div>
-        <MaintenanceDialog vehicles={vehicles} onSuccess={fetchData} />
+        <Button className="gradient-primary border-0" onClick={handleAdd}>
+          <Plus className="h-4 w-4 mr-2" />
+          Planifier une maintenance
+        </Button>
       </div>
 
       {/* Stats */}
@@ -112,7 +114,7 @@ const Maintenance = () => {
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-sm text-muted-foreground">Terminées</p>
-          <p className="text-2xl font-bold">{maintenanceHistory.length}</p>
+          <p className="text-2xl font-bold text-success">{maintenanceHistory.length}</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-sm text-muted-foreground">Coût total</p>
@@ -136,9 +138,9 @@ const Maintenance = () => {
           {loading ? (
             <p className="text-center text-muted-foreground py-8">Chargement...</p>
           ) : scheduledMaintenance.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              Aucune maintenance planifiée
-            </p>
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground">Aucune maintenance planifiée</p>
+            </Card>
           ) : (
             scheduledMaintenance.map((item) => {
               const StatusIcon = statusConfig[item.status as keyof typeof statusConfig].icon;
@@ -167,15 +169,13 @@ const Maintenance = () => {
                             <h3 className="font-semibold text-lg">{item.type}</h3>
                             <p className="text-sm text-muted-foreground">{vehicleInfo}</p>
                           </div>
-                          <div className="flex gap-2">
-                            <Badge
-                              className={
-                                statusConfig[item.status as keyof typeof statusConfig].color
-                              }
-                            >
-                              {statusConfig[item.status as keyof typeof statusConfig].label}
-                            </Badge>
-                          </div>
+                          <Badge
+                            className={
+                              statusConfig[item.status as keyof typeof statusConfig].color
+                            }
+                          >
+                            {statusConfig[item.status as keyof typeof statusConfig].label}
+                          </Badge>
                         </div>
 
                         <div className="flex gap-6 text-sm flex-wrap">
@@ -214,11 +214,13 @@ const Maintenance = () => {
                         </div>
 
                         <div className="flex gap-2 pt-2">
-                          <MaintenanceDialog
-                            vehicles={vehicles}
-                            onSuccess={fetchData}
-                            editData={item}
-                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(item)}
+                          >
+                            Modifier
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"
@@ -240,9 +242,9 @@ const Maintenance = () => {
           {loading ? (
             <p className="text-center text-muted-foreground py-8">Chargement...</p>
           ) : maintenanceHistory.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              Aucun historique de maintenance
-            </p>
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground">Aucun historique de maintenance</p>
+            </Card>
           ) : (
             maintenanceHistory.map((item) => {
               const vehicleInfo = item.vehicles
@@ -278,11 +280,13 @@ const Maintenance = () => {
                         </div>
 
                         <div className="flex gap-2 pt-2">
-                          <MaintenanceDialog
-                            vehicles={vehicles}
-                            onSuccess={fetchData}
-                            editData={item}
-                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(item)}
+                          >
+                            Modifier
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"
@@ -300,6 +304,14 @@ const Maintenance = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      <MaintenanceDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        maintenance={selectedMaintenance}
+        vehicles={vehicles}
+        onSave={fetchData}
+      />
     </div>
   );
 };
