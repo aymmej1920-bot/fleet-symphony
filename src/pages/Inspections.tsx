@@ -1,10 +1,39 @@
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ClipboardCheck, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { Plus, ClipboardCheck, AlertTriangle, CheckCircle, XCircle, Trash2, Edit } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { InspectionDialog } from "@/components/InspectionDialog";
 
 const Inspections = () => {
-  const inspections = [
+  const [inspections, setInspections] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedInspection, setSelectedInspection] = useState<any>(null);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [{ data: inspData }, { data: vehData }] = await Promise.all([
+        supabase.from("inspections").select("*, vehicles(brand, model, plate)").order("date", { ascending: false }),
+        supabase.from("vehicles").select("*"),
+      ]);
+      if (inspData) setInspections(inspData);
+      if (vehData) setVehicles(vehData);
+    } catch (error: any) {
+      toast.error("Erreur");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const mockInspections = [
     {
       id: "1",
       vehicle: "Renault Master - AB-123-CD",
@@ -75,7 +104,7 @@ const Inspections = () => {
             Suivez les contrôles et anomalies
           </p>
         </div>
-        <Button className="gradient-primary border-0">
+        <Button className="gradient-primary border-0" onClick={() => { setSelectedInspection(null); setDialogOpen(true); }}>
           <Plus className="h-4 w-4 mr-2" />
           Nouvelle inspection
         </Button>
@@ -135,8 +164,9 @@ const Inspections = () => {
       {/* Inspections List */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Inspections récentes</h2>
+        {loading ? <p className="text-center py-8">Chargement...</p> :
         <div className="grid gap-4">
-          {inspections.map((inspection) => {
+          {(inspections.length > 0 ? inspections : mockInspections).map((inspection) => {
             const config = statusConfig[inspection.status as keyof typeof statusConfig];
             const StatusIcon = config.icon;
             
@@ -198,8 +228,9 @@ const Inspections = () => {
               </Card>
             );
           })}
-        </div>
+        </div>}
       </div>
+      <InspectionDialog open={dialogOpen} onOpenChange={setDialogOpen} inspection={selectedInspection} vehicles={vehicles} onSave={fetchData} />
     </div>
   );
 };

@@ -1,43 +1,64 @@
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, AlertCircle, CheckCircle, Clock } from "lucide-react";
+import { Plus, FileText, AlertCircle, CheckCircle, Clock, Trash2, Edit } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { DocumentDialog } from "@/components/DocumentDialog";
 
 const Documents = () => {
-  const documents = [
-    {
-      id: "1",
-      vehicle: "Renault Master - AB-123-CD",
-      type: "Assurance",
-      expiryDate: "2026-03-15",
-      status: "valid",
-      daysUntilExpiry: 124,
-    },
-    {
-      id: "2",
-      vehicle: "Peugeot Partner - EF-456-GH",
-      type: "Contrôle technique",
-      expiryDate: "2025-11-20",
-      status: "expiring-soon",
-      daysUntilExpiry: 8,
-    },
-    {
-      id: "3",
-      vehicle: "Citroën Berlingo - IJ-789-KL",
-      type: "Carte grise",
-      expiryDate: "2025-11-05",
-      status: "expired",
-      daysUntilExpiry: -7,
-    },
-    {
-      id: "4",
-      vehicle: "Ford Transit - MN-012-OP",
-      type: "Permis de conduire",
-      expiryDate: "2027-06-30",
-      status: "valid",
-      daysUntilExpiry: 597,
-    },
-  ];
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<any>(null);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [{ data: documentsData }, { data: vehiclesData }] = await Promise.all([
+        supabase
+          .from("documents")
+          .select(`*, vehicles (brand, model, plate)`)
+          .order("expiry_date"),
+        supabase.from("vehicles").select("*").order("brand"),
+      ]);
+
+      if (documentsData) setDocuments(documentsData);
+      if (vehiclesData) setVehicles(vehiclesData);
+    } catch (error: any) {
+      toast.error("Impossible de charger les données");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce document ?")) return;
+
+    try {
+      const { error } = await supabase.from("documents").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Document supprimé");
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleEdit = (document: any) => {
+    setSelectedDocument(document);
+    setDialogOpen(true);
+  };
+
+  const handleAdd = () => {
+    setSelectedDocument(null);
+    setDialogOpen(true);
+  };
 
   const statusConfig = {
     valid: {
@@ -62,9 +83,9 @@ const Documents = () => {
 
   const stats = {
     total: documents.length,
-    valid: documents.filter(d => d.status === "valid").length,
-    expiringSoon: documents.filter(d => d.status === "expiring-soon").length,
-    expired: documents.filter(d => d.status === "expired").length,
+    valid: documents.filter((d) => d.status === "valid").length,
+    expiringSoon: documents.filter((d) => d.status === "expiring-soon").length,
+    expired: documents.filter((d) => d.status === "expired").length,
   };
 
   return (
@@ -77,7 +98,7 @@ const Documents = () => {
             Suivez les documents obligatoires
           </p>
         </div>
-        <Button className="gradient-primary border-0">
+        <Button className="gradient-primary border-0" onClick={handleAdd}>
           <Plus className="h-4 w-4 mr-2" />
           Ajouter un document
         </Button>
@@ -137,66 +158,109 @@ const Documents = () => {
       {/* Documents List */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Documents</h2>
-        <div className="grid gap-4">
-          {documents.map((doc) => {
-            const config = statusConfig[doc.status as keyof typeof statusConfig];
-            const StatusIcon = config.icon;
-            
-            return (
-              <Card key={doc.id} className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex gap-4 flex-1">
-                    <div className={`rounded-lg p-3 ${doc.status === 'valid' ? 'bg-success/10' : doc.status === 'expiring-soon' ? 'bg-warning/10' : 'bg-destructive/10'}`}>
-                      <StatusIcon className={`h-6 w-6 ${config.iconColor}`} />
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-semibold text-lg">{doc.type}</h3>
-                          <p className="text-sm text-muted-foreground">{doc.vehicle}</p>
-                        </div>
-                        <Badge className={config.color}>
-                          {config.label}
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex gap-6 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Expiration: </span>
-                          <span className="font-medium">
-                            {new Date(doc.expiryDate).toLocaleDateString('fr-FR')}
-                          </span>
-                        </div>
-                        {doc.status !== 'expired' && (
-                          <div>
-                            <span className="text-muted-foreground">Dans </span>
-                            <span className={`font-medium ${doc.daysUntilExpiry < 30 ? 'text-warning' : ''}`}>
-                              {doc.daysUntilExpiry} jours
-                            </span>
-                          </div>
-                        )}
-                        {doc.status === 'expired' && (
-                          <div>
-                            <span className="text-destructive font-medium">
-                              Expiré depuis {Math.abs(doc.daysUntilExpiry)} jours
-                            </span>
-                          </div>
-                        )}
-                      </div>
+        {loading ? (
+          <p className="text-center text-muted-foreground py-8">Chargement...</p>
+        ) : documents.length === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground">Aucun document enregistré</p>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {documents.map((doc) => {
+              const config = statusConfig[doc.status as keyof typeof statusConfig];
+              const StatusIcon = config.icon;
+              const vehicleInfo = doc.vehicles
+                ? `${doc.vehicles.brand} ${doc.vehicles.model} - ${doc.vehicles.plate}`
+                : "Véhicule inconnu";
 
-                      <div className="pt-2">
-                        <Button variant="outline" size="sm">
-                          Renouveler
-                        </Button>
+              const expiryDate = new Date(doc.expiry_date);
+              const today = new Date();
+              const daysUntilExpiry = Math.ceil(
+                (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+              );
+
+              return (
+                <Card key={doc.id} className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex gap-4 flex-1">
+                      <div
+                        className={`rounded-lg p-3 ${
+                          doc.status === "valid"
+                            ? "bg-success/10"
+                            : doc.status === "expiring-soon"
+                            ? "bg-warning/10"
+                            : "bg-destructive/10"
+                        }`}
+                      >
+                        <StatusIcon className={`h-6 w-6 ${config.iconColor}`} />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="font-semibold text-lg">{doc.type}</h3>
+                            <p className="text-sm text-muted-foreground">{vehicleInfo}</p>
+                          </div>
+                          <Badge className={config.color}>{config.label}</Badge>
+                        </div>
+
+                        <div className="flex gap-6 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Expiration: </span>
+                            <span className="font-medium">
+                              {expiryDate.toLocaleDateString("fr-FR")}
+                            </span>
+                          </div>
+                          {daysUntilExpiry >= 0 && (
+                            <div>
+                              <span className="text-muted-foreground">Dans </span>
+                              <span
+                                className={`font-medium ${
+                                  daysUntilExpiry < 30 ? "text-warning" : ""
+                                }`}
+                              >
+                                {daysUntilExpiry} jours
+                              </span>
+                            </div>
+                          )}
+                          {daysUntilExpiry < 0 && (
+                            <div>
+                              <span className="text-destructive font-medium">
+                                Expiré depuis {Math.abs(daysUntilExpiry)} jours
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2 pt-2 border-t border-border">
+                          <Button variant="outline" size="sm" onClick={() => handleEdit(doc)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Modifier
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(doc.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      <DocumentDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        document={selectedDocument}
+        vehicles={vehicles}
+        onSave={fetchData}
+      />
     </div>
   );
 };

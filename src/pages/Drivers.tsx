@@ -1,53 +1,69 @@
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, Search, Phone, Mail, Car } from "lucide-react";
+import { Plus, Search, Phone, Mail, Car, Trash2, Edit } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { DriverDialog } from "@/components/DriverDialog";
 
 const Drivers = () => {
-  const drivers = [
-    {
-      id: "1",
-      name: "Jean Dupont",
-      email: "jean.dupont@email.com",
-      phone: "+33 6 12 34 56 78",
-      status: "available",
-      vehicle: "Renault Master - AB-123-CD",
-      trips: 145,
-      rating: 4.8,
-    },
-    {
-      id: "2",
-      name: "Marie Martin",
-      email: "marie.martin@email.com",
-      phone: "+33 6 23 45 67 89",
-      status: "on-route",
-      vehicle: "Peugeot Partner - EF-456-GH",
-      trips: 203,
-      rating: 4.9,
-    },
-    {
-      id: "3",
-      name: "Pierre Bernard",
-      email: "pierre.bernard@email.com",
-      phone: "+33 6 34 56 78 90",
-      status: "available",
-      vehicle: "Non assigné",
-      trips: 87,
-      rating: 4.6,
-    },
-    {
-      id: "4",
-      name: "Sophie Dubois",
-      email: "sophie.dubois@email.com",
-      phone: "+33 6 45 67 89 01",
-      status: "off-duty",
-      vehicle: "Ford Transit - MN-012-OP",
-      trips: 176,
-      rating: 4.7,
-    },
-  ];
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedDriver, setSelectedDriver] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [{ data: driversData }, { data: vehiclesData }] = await Promise.all([
+        supabase.from("drivers").select("*").order("name"),
+        supabase.from("vehicles").select("*").order("brand"),
+      ]);
+
+      if (driversData) setDrivers(driversData);
+      if (vehiclesData) setVehicles(vehiclesData);
+    } catch (error: any) {
+      toast.error("Impossible de charger les données");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce conducteur ?")) return;
+
+    try {
+      const { error } = await supabase.from("drivers").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Conducteur supprimé");
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleEdit = (driver: any) => {
+    setSelectedDriver(driver);
+    setDialogOpen(true);
+  };
+
+  const handleAdd = () => {
+    setSelectedDriver(null);
+    setDialogOpen(true);
+  };
+
+  const filteredDrivers = drivers.filter((driver) =>
+    driver.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    driver.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const statusConfig = {
     available: { label: "Disponible", color: "bg-success text-success-foreground" },
@@ -65,7 +81,7 @@ const Drivers = () => {
             Gérez votre équipe de conducteurs
           </p>
         </div>
-        <Button className="gradient-primary border-0">
+        <Button className="gradient-primary border-0" onClick={handleAdd}>
           <Plus className="h-4 w-4 mr-2" />
           Ajouter un conducteur
         </Button>
@@ -98,56 +114,106 @@ const Drivers = () => {
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Rechercher un conducteur..." className="pl-10" />
+        <Input
+          placeholder="Rechercher un conducteur..."
+          className="pl-10"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       {/* Drivers List */}
-      <div className="grid gap-4">
-        {drivers.map((driver) => (
-          <Card key={driver.id} className="p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-start gap-6">
-              <Avatar className="h-16 w-16">
-                <AvatarFallback className="bg-primary text-primary-foreground text-lg">
-                  {driver.name.split(' ').map(n => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
+      {loading ? (
+        <p className="text-center text-muted-foreground py-8">Chargement...</p>
+      ) : (
+        <div className="grid gap-4">
+          {filteredDrivers.map((driver) => {
+            const assignedVehicle = vehicles.find((v) => v.id === driver.assigned_vehicle_id);
+            const vehicleText = assignedVehicle
+              ? `${assignedVehicle.brand} ${assignedVehicle.model} - ${assignedVehicle.plate}`
+              : "Non assigné";
 
-              <div className="flex-1 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold">{driver.name}</h3>
-                    <Badge className={`${statusConfig[driver.status as keyof typeof statusConfig].color} mt-1`}>
-                      {statusConfig[driver.status as keyof typeof statusConfig].label}
-                    </Badge>
-                  </div>
-                  <div className="text-right">
-                    <div className="flex items-center gap-1">
-                      <span className="text-2xl font-bold">{driver.rating}</span>
-                      <span className="text-warning text-xl">★</span>
+            return (
+              <Card key={driver.id} className="p-6 hover:shadow-lg transition-shadow">
+                <div className="flex items-start gap-6">
+                  <Avatar className="h-16 w-16">
+                    <AvatarFallback className="bg-primary text-primary-foreground text-lg">
+                      {driver.name.split(" ").map((n: string) => n[0]).join("")}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-xl font-semibold">{driver.name}</h3>
+                        <Badge
+                          className={`${
+                            statusConfig[driver.status as keyof typeof statusConfig].color
+                          } mt-1`}
+                        >
+                          {statusConfig[driver.status as keyof typeof statusConfig].label}
+                        </Badge>
+                      </div>
+                      <div className="text-right">
+                        <div className="flex items-center gap-1">
+                          <span className="text-2xl font-bold">{driver.rating || 5.0}</span>
+                          <span className="text-warning text-xl">★</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {driver.total_trips || 0} trajets
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">{driver.trips} trajets</p>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>{driver.email}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{driver.phone}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Car className="h-4 w-4 text-muted-foreground" />
-                    <span>{driver.vehicle}</span>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <span>{driver.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span>{driver.phone || "Non renseigné"}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Car className="h-4 w-4 text-muted-foreground" />
+                        <span>{vehicleText}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-2 border-t border-border">
+                      <Button variant="outline" size="sm" onClick={() => handleEdit(driver)}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Modifier
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(driver.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </Card>
+            );
+          })}
+
+          {filteredDrivers.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Aucun conducteur trouvé</p>
             </div>
-          </Card>
-        ))}
-      </div>
+          )}
+        </div>
+      )}
+
+      <DriverDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        driver={selectedDriver}
+        vehicles={vehicles}
+        onSave={fetchData}
+      />
     </div>
   );
 };

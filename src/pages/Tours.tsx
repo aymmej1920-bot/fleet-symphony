@@ -1,10 +1,53 @@
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MapPin, User, Car, Clock, CheckCircle } from "lucide-react";
+import { Plus, MapPin, User, Car, Clock, CheckCircle, Trash2, Edit } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { TourDialog } from "@/components/TourDialog";
 
 const Tours = () => {
-  const tours = [
+  const [tours, setTours] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedTour, setSelectedTour] = useState<any>(null);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [{ data: toursData }, { data: vehiclesData }, { data: driversData }] = await Promise.all([
+        supabase.from("tours").select("*, vehicles(brand, model, plate), drivers(name)").order("start_time", { ascending: false }),
+        supabase.from("vehicles").select("*"),
+        supabase.from("drivers").select("*"),
+      ]);
+      if (toursData) setTours(toursData);
+      if (vehiclesData) setVehicles(vehiclesData);
+      if (driversData) setDrivers(driversData);
+    } catch (error: any) {
+      toast.error("Erreur de chargement");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Supprimer cette tournée ?")) return;
+    try {
+      await supabase.from("tours").delete().eq("id", id);
+      toast.success("Tournée supprimée");
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const mockTours = [
     {
       id: "1",
       name: "Livraison Zone Nord",
@@ -68,7 +111,7 @@ const Tours = () => {
             Planifiez et suivez vos missions
           </p>
         </div>
-        <Button className="gradient-primary border-0">
+        <Button className="gradient-primary border-0" onClick={() => { setSelectedTour(null); setDialogOpen(true); }}>
           <Plus className="h-4 w-4 mr-2" />
           Nouvelle tournée
         </Button>
@@ -132,8 +175,9 @@ const Tours = () => {
       {/* Tours List */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Tournées du jour</h2>
+        {loading ? <p className="text-center py-8">Chargement...</p> : 
         <div className="grid gap-4">
-          {tours.map((tour) => (
+          {(tours.length > 0 ? tours : mockTours).map((tour) => (
             <Card key={tour.id} className="p-6">
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
@@ -192,8 +236,9 @@ const Tours = () => {
               </div>
             </Card>
           ))}
-        </div>
+        </div>}
       </div>
+      <TourDialog open={dialogOpen} onOpenChange={setDialogOpen} tour={selectedTour} vehicles={vehicles} drivers={drivers} onSave={fetchData} />
     </div>
   );
 };

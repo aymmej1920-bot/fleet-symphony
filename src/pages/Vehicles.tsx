@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { VehicleCard } from "@/components/VehicleCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter } from "lucide-react";
+import { Plus, Search, Filter, Trash2, Edit } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -11,62 +11,60 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { VehicleDialog } from "@/components/VehicleDialog";
 
 const Vehicles = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
 
-  const vehicles = [
-    {
-      id: "1",
-      brand: "Renault",
-      model: "Master",
-      plate: "AB-123-CD",
-      status: "active" as const,
-      mileage: 45320,
-      fuelLevel: 75,
-      nextMaintenance: "15/11/2025"
-    },
-    {
-      id: "2",
-      brand: "Peugeot",
-      model: "Partner",
-      plate: "EF-456-GH",
-      status: "active" as const,
-      mileage: 32150,
-      fuelLevel: 45,
-      nextMaintenance: "22/11/2025"
-    },
-    {
-      id: "3",
-      brand: "Citroën",
-      model: "Berlingo",
-      plate: "IJ-789-KL",
-      status: "maintenance" as const,
-      mileage: 67890,
-      fuelLevel: 30,
-      nextMaintenance: "En cours"
-    },
-    {
-      id: "4",
-      brand: "Ford",
-      model: "Transit",
-      plate: "MN-012-OP",
-      status: "active" as const,
-      mileage: 28450,
-      fuelLevel: 90,
-      nextMaintenance: "30/11/2025"
-    },
-    {
-      id: "5",
-      brand: "Mercedes",
-      model: "Sprinter",
-      plate: "QR-345-ST",
-      status: "inactive" as const,
-      mileage: 89120,
-      nextMaintenance: "05/12/2025"
-    },
-  ];
+  useEffect(() => {
+    fetchVehicles();
+  }, []);
+
+  const fetchVehicles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("vehicles")
+        .select("*")
+        .order("brand");
+
+      if (error) throw error;
+      setVehicles(data || []);
+    } catch (error: any) {
+      toast.error("Impossible de charger les véhicules");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce véhicule ?")) return;
+
+    try {
+      const { error } = await supabase.from("vehicles").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Véhicule supprimé");
+      fetchVehicles();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleEdit = (vehicle: any) => {
+    setSelectedVehicle(vehicle);
+    setDialogOpen(true);
+  };
+
+  const handleAdd = () => {
+    setSelectedVehicle(null);
+    setDialogOpen(true);
+  };
 
   const filteredVehicles = vehicles.filter(vehicle => {
     const matchesSearch = vehicle.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -93,7 +91,7 @@ const Vehicles = () => {
             Gérez et suivez votre flotte de véhicules
           </p>
         </div>
-        <Button className="gradient-primary border-0">
+        <Button className="gradient-primary border-0" onClick={handleAdd}>
           <Plus className="h-4 w-4 mr-2" />
           Ajouter un véhicule
         </Button>
@@ -145,21 +143,40 @@ const Vehicles = () => {
       </div>
 
       {/* Vehicles Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredVehicles.map((vehicle) => (
-          <VehicleCard
-            key={vehicle.id}
-            vehicle={vehicle}
-            onClick={() => console.log(`Voir détails: ${vehicle.id}`)}
-          />
-        ))}
-      </div>
+      {loading ? (
+        <p className="text-center text-muted-foreground py-8">Chargement...</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredVehicles.map((vehicle) => (
+              <VehicleCard
+                key={vehicle.id}
+                vehicle={{
+                  ...vehicle,
+                  nextMaintenance: vehicle.next_maintenance_date
+                    ? new Date(vehicle.next_maintenance_date).toLocaleDateString("fr-FR")
+                    : "Non définie",
+                  fuelLevel: vehicle.fuel_level,
+                }}
+                onClick={() => handleEdit(vehicle)}
+              />
+            ))}
+          </div>
 
-      {filteredVehicles.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Aucun véhicule trouvé</p>
-        </div>
+          {filteredVehicles.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Aucun véhicule trouvé</p>
+            </div>
+          )}
+        </>
       )}
+
+      <VehicleDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        vehicle={selectedVehicle}
+        onSave={fetchVehicles}
+      />
     </div>
   );
 };
