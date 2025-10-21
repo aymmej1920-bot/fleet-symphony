@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { StatsCard } from "@/components/StatsCard";
 import { VehicleCard } from "@/components/VehicleCard";
 import { AlertCard } from "@/components/AlertCard";
@@ -13,97 +14,116 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Index = () => {
   const navigate = useNavigate();
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [maintenances, setMaintenances] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [vehiclesRes, driversRes, maintenancesRes, documentsRes] = await Promise.all([
+        supabase.from("vehicles").select("*"),
+        supabase.from("drivers").select("*"),
+        supabase.from("maintenance_records").select("*"),
+        supabase.from("documents").select("*, vehicles(brand, model, plate)"),
+      ]);
+
+      if (vehiclesRes.error) throw vehiclesRes.error;
+      if (driversRes.error) throw driversRes.error;
+      if (maintenancesRes.error) throw maintenancesRes.error;
+      if (documentsRes.error) throw documentsRes.error;
+
+      setVehicles(vehiclesRes.data || []);
+      setDrivers(driversRes.data || []);
+      setMaintenances(maintenancesRes.data || []);
+      setDocuments(documentsRes.data || []);
+    } catch (error: any) {
+      toast.error("Erreur lors du chargement des données");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activeVehicles = vehicles.filter(v => v.status === "active").length;
+  const scheduledMaintenances = maintenances.filter(m => m.status === "scheduled").length;
+  const today = new Date();
+  const expiredDocs = documents.filter(d => new Date(d.expiry_date) < today).length;
+  const lowFuelVehicles = vehicles.filter(v => v.fuel_level < 30).length;
+  const totalAlerts = expiredDocs + lowFuelVehicles;
 
   const stats = [
     {
       title: "Véhicules actifs",
-      value: 42,
+      value: activeVehicles,
       icon: Car,
       variant: "success" as const,
-      trend: { value: 8, label: "vs mois dernier" }
+      trend: { value: vehicles.length - activeVehicles, label: "autres statuts" }
     },
     {
       title: "Conducteurs",
-      value: 56,
+      value: drivers.length,
       icon: Users,
       variant: "default" as const,
-      trend: { value: 3, label: "nouveaux" }
+      trend: { value: drivers.filter(d => d.status === "available").length, label: "disponibles" }
     },
     {
       title: "Maintenances prévues",
-      value: 7,
+      value: scheduledMaintenances,
       icon: Wrench,
       variant: "warning" as const,
-      trend: { value: 2, label: "cette semaine" }
+      trend: { value: maintenances.filter(m => m.status === "in-progress").length, label: "en cours" }
     },
     {
       title: "Alertes actives",
-      value: 3,
+      value: totalAlerts,
       icon: AlertTriangle,
       variant: "destructive" as const,
-      trend: { value: -40, label: "vs hier" }
+      trend: { value: expiredDocs, label: "documents expirés" }
     }
   ];
 
-  const vehicles = [
-    {
-      id: "1",
-      brand: "Renault",
-      model: "Master",
-      plate: "AB-123-CD",
-      status: "active" as const,
-      mileage: 45320,
-      fuelLevel: 75,
-      nextMaintenance: "15/11/2025"
-    },
-    {
-      id: "2",
-      brand: "Peugeot",
-      model: "Partner",
-      plate: "EF-456-GH",
-      status: "active" as const,
-      mileage: 32150,
-      fuelLevel: 45,
-      nextMaintenance: "22/11/2025"
-    },
-    {
-      id: "3",
-      brand: "Citroën",
-      model: "Berlingo",
-      plate: "IJ-789-KL",
-      status: "maintenance" as const,
-      mileage: 67890,
-      fuelLevel: 30,
-      nextMaintenance: "En cours"
-    }
-  ];
+  const recentVehicles = vehicles
+    .slice(0, 3)
+    .map(v => ({
+      ...v,
+      nextMaintenance: v.next_maintenance_date 
+        ? new Date(v.next_maintenance_date).toLocaleDateString("fr-FR")
+        : "Non définie",
+      fuelLevel: v.fuel_level
+    }));
 
   const alerts = [
-    {
-      id: "1",
-      type: "critical" as const,
-      title: "Maintenance urgente requise",
-      description: "Renault Master (AB-123-CD) - Contrôle technique expiré",
-      timestamp: "Il y a 2h"
-    },
-    {
-      id: "2",
-      type: "warning" as const,
-      title: "Niveau de carburant bas",
-      description: "Citroën Berlingo (IJ-789-KL) - 30% restant",
-      timestamp: "Il y a 4h"
-    },
-    {
-      id: "3",
-      type: "info" as const,
-      title: "Rapport mensuel disponible",
-      description: "Le rapport d'activité d'octobre est prêt à être consulté",
-      timestamp: "Il y a 1j"
-    }
-  ];
+    ...documents
+      .filter(d => new Date(d.expiry_date) < today)
+      .slice(0, 2)
+      .map(d => ({
+        id: d.id,
+        type: "critical" as const,
+        title: "Document expiré",
+        description: `${d.type} - ${d.vehicles?.brand} ${d.vehicles?.model} (${d.vehicles?.plate})`,
+        timestamp: `Expiré le ${new Date(d.expiry_date).toLocaleDateString("fr-FR")}`
+      })),
+    ...vehicles
+      .filter(v => v.fuel_level < 30)
+      .slice(0, 1)
+      .map(v => ({
+        id: v.id,
+        type: "warning" as const,
+        title: "Niveau de carburant bas",
+        description: `${v.brand} ${v.model} (${v.plate}) - ${v.fuel_level}% restant`,
+        timestamp: "Maintenant"
+      }))
+  ].slice(0, 3);
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-8">
@@ -178,23 +198,33 @@ const Index = () => {
             </div>
           </div>
 
-          <div className="grid gap-4">
-            {vehicles.map((vehicle) => (
-              <VehicleCard 
-                key={vehicle.id} 
-                vehicle={vehicle}
-                onClick={() => navigate('/vehicles')}
-              />
-            ))}
-          </div>
+          {loading ? (
+            <p className="text-center text-muted-foreground py-8">Chargement...</p>
+          ) : (
+            <>
+              <div className="grid gap-4">
+                {recentVehicles.map((vehicle) => (
+                  <VehicleCard 
+                    key={vehicle.id} 
+                    vehicle={vehicle}
+                    onClick={() => navigate('/vehicles')}
+                  />
+                ))}
+              </div>
 
-          <Button 
-            variant="outline" 
-            className="w-full"
-            onClick={() => navigate('/vehicles')}
-          >
-            Voir tous les véhicules (42)
-          </Button>
+              {recentVehicles.length === 0 && (
+                <p className="text-center text-muted-foreground py-8">Aucun véhicule</p>
+              )}
+
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => navigate('/vehicles')}
+              >
+                Voir tous les véhicules ({vehicles.length})
+              </Button>
+            </>
+          )}
         </section>
 
         {/* Alerts Sidebar */}
@@ -204,15 +234,25 @@ const Index = () => {
             <p className="text-sm text-muted-foreground">Notifications importantes</p>
           </div>
 
-          <div className="space-y-3">
-            {alerts.map((alert) => (
-              <AlertCard key={alert.id} alert={alert} />
-            ))}
-          </div>
+          {loading ? (
+            <p className="text-center text-muted-foreground py-8">Chargement...</p>
+          ) : (
+            <>
+              <div className="space-y-3">
+                {alerts.map((alert) => (
+                  <AlertCard key={alert.id} alert={alert} />
+                ))}
+              </div>
 
-          <Button variant="outline" className="w-full">
-            Voir toutes les alertes
-          </Button>
+              {alerts.length === 0 && (
+                <p className="text-center text-muted-foreground py-8">Aucune alerte</p>
+              )}
+
+              <Button variant="outline" className="w-full">
+                Voir toutes les alertes ({totalAlerts})
+              </Button>
+            </>
+          )}
         </section>
       </div>
     </div>

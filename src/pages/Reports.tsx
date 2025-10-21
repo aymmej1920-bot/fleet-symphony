@@ -1,33 +1,106 @@
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, TrendingUp, TrendingDown, DollarSign, Fuel, Wrench, BarChart3 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Reports = () => {
-  const monthlyData = {
-    totalCost: 15340,
-    fuelCost: 8450,
-    maintenanceCost: 6890,
-    vehicleUtilization: 87,
-    trends: {
-      cost: -5,
-      fuel: 3,
-      maintenance: -12,
+  const [loading, setLoading] = useState(true);
+  const [fuelRecords, setFuelRecords] = useState<any[]>([]);
+  const [maintenanceRecords, setMaintenanceRecords] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [tours, setTours] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [fuelRes, maintenanceRes, vehiclesRes, driversRes, toursRes] = await Promise.all([
+        supabase.from("fuel_records").select("*, vehicles(brand, model, plate)"),
+        supabase.from("maintenance_records").select("*, vehicles(brand, model, plate)"),
+        supabase.from("vehicles").select("*"),
+        supabase.from("drivers").select("*"),
+        supabase.from("tours").select("*"),
+      ]);
+
+      if (fuelRes.error) throw fuelRes.error;
+      if (maintenanceRes.error) throw maintenanceRes.error;
+      if (vehiclesRes.error) throw vehiclesRes.error;
+      if (driversRes.error) throw driversRes.error;
+      if (toursRes.error) throw toursRes.error;
+
+      setFuelRecords(fuelRes.data || []);
+      setMaintenanceRecords(maintenanceRes.data || []);
+      setVehicles(vehiclesRes.data || []);
+      setDrivers(driversRes.data || []);
+      setTours(toursRes.data || []);
+    } catch (error: any) {
+      toast.error("Erreur lors du chargement des données");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const topVehicles = [
-    { vehicle: "Renault Master - AB-123-CD", cost: 2340, efficiency: 92 },
-    { vehicle: "Peugeot Partner - EF-456-GH", cost: 1850, efficiency: 88 },
-    { vehicle: "Ford Transit - MN-012-OP", cost: 2150, efficiency: 85 },
-  ];
+  const fuelCost = fuelRecords.reduce((sum, record) => sum + (parseFloat(record.cost) || 0), 0);
+  const maintenanceCost = maintenanceRecords.reduce((sum, record) => sum + (parseFloat(record.cost) || 0), 0);
+  const totalCost = fuelCost + maintenanceCost;
+  const activeVehicles = vehicles.filter(v => v.status === "active").length;
+  const vehicleUtilization = vehicles.length > 0 ? Math.round((activeVehicles / vehicles.length) * 100) : 0;
 
-  const topDrivers = [
-    { name: "Marie Martin", trips: 203, rating: 4.9, consumption: 6.5 },
-    { name: "Jean Dupont", trips: 145, rating: 4.8, consumption: 8.2 },
-    { name: "Sophie Dubois", trips: 176, rating: 4.7, consumption: 7.1 },
-  ];
+  const monthlyData = {
+    totalCost: Math.round(totalCost),
+    fuelCost: Math.round(fuelCost),
+    maintenanceCost: Math.round(maintenanceCost),
+    vehicleUtilization,
+    trends: {
+      cost: 0,
+      fuel: 0,
+      maintenance: 0,
+    }
+  };
+
+  const vehicleCosts = vehicles.map(vehicle => {
+    const vFuelCost = fuelRecords
+      .filter(f => f.vehicle_id === vehicle.id)
+      .reduce((sum, f) => sum + (parseFloat(f.cost) || 0), 0);
+    const vMaintenanceCost = maintenanceRecords
+      .filter(m => m.vehicle_id === vehicle.id)
+      .reduce((sum, m) => sum + (parseFloat(m.cost) || 0), 0);
+    const totalVehicleCost = vFuelCost + vMaintenanceCost;
+    
+    return {
+      vehicle: `${vehicle.brand} ${vehicle.model} - ${vehicle.plate}`,
+      cost: Math.round(totalVehicleCost),
+      efficiency: vehicle.fuel_level || 0
+    };
+  }).sort((a, b) => b.cost - a.cost);
+
+  const topVehicles = vehicleCosts.slice(0, 3);
+
+  const driverStats = drivers.map(driver => {
+    const driverTours = tours.filter(t => t.driver_id === driver.id);
+    const completedTours = driverTours.filter(t => t.status === "completed");
+    const totalDistance = driverTours.reduce((sum, t) => sum + (parseFloat(t.distance_km) || 0), 0);
+    const totalFuel = fuelRecords
+      .filter(f => f.driver_id === driver.id)
+      .reduce((sum, f) => sum + (parseFloat(f.liters) || 0), 0);
+    const consumption = totalDistance > 0 ? (totalFuel / totalDistance) * 100 : 0;
+
+    return {
+      name: driver.name,
+      trips: completedTours.length,
+      rating: parseFloat(driver.rating) || 5.0,
+      consumption: consumption.toFixed(1)
+    };
+  }).sort((a, b) => b.trips - a.trips);
+
+  const topDrivers = driverStats.slice(0, 3);
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-6">
@@ -46,7 +119,10 @@ const Reports = () => {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {loading ? (
+        <p className="text-center text-muted-foreground py-8">Chargement...</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="p-5 border-border">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-primary/10 p-3">
@@ -116,9 +192,11 @@ const Reports = () => {
             </div>
           </div>
         </Card>
-      </div>
+        </div>
+      )}
 
       {/* Detailed Reports */}
+      {!loading && (
       <Tabs defaultValue="vehicles" className="space-y-4">
         <TabsList>
           <TabsTrigger value="vehicles">Par véhicule</TabsTrigger>
@@ -204,6 +282,7 @@ const Reports = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      )}
     </div>
   );
 };
