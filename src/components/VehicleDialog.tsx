@@ -6,6 +6,18 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { z } from "zod";
+
+const vehicleSchema = z.object({
+  brand: z.string().trim().min(1, "Marque requise").max(50, "Marque trop longue"),
+  model: z.string().trim().min(1, "Modèle requis").max(50, "Modèle trop long"),
+  plate: z.string().trim().min(1, "Plaque requise").max(20, "Plaque trop longue"),
+  year: z.number().min(1900).max(new Date().getFullYear() + 1, "Année invalide"),
+  status: z.string(),
+  mileage: z.number().min(0, "Kilométrage invalide"),
+  fuel_level: z.number().min(0).max(100, "Niveau doit être entre 0 et 100"),
+  next_maintenance_date: z.string().optional(),
+});
 
 interface VehicleDialogProps {
   open: boolean;
@@ -54,7 +66,13 @@ export const VehicleDialog = ({ open, onOpenChange, vehicle, onSave }: VehicleDi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
+    const result = vehicleSchema.safeParse(formData);
+    if (!result.success) {
+      toast.error(result.error.errors[0].message);
+      return;
+    }
+    
     try {
       if (vehicle) {
         const { error } = await supabase

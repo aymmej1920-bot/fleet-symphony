@@ -2,13 +2,26 @@ import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
-import { Bell, Car } from "lucide-react";
+import { Bell, Car, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 export const Layout = ({ children }: LayoutProps) => {
+  const { signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast.success("Déconnexion réussie");
+    } catch (error) {
+      toast.error("Erreur lors de la déconnexion");
+    }
+  };
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
@@ -37,6 +50,9 @@ export const Layout = ({ children }: LayoutProps) => {
                   <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] text-white flex items-center justify-center">
                     3
                   </span>
+                </Button>
+                <Button variant="outline" size="icon" onClick={handleSignOut}>
+                  <LogOut className="h-5 w-5" />
                 </Button>
               </div>
             </div>

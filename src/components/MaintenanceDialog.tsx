@@ -7,6 +7,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { z } from "zod";
+
+const maintenanceSchema = z.object({
+  vehicle_id: z.string().min(1, "Véhicule requis"),
+  type: z.string().trim().min(1, "Type requis").max(100, "Type trop long"),
+  date: z.string().min(1, "Date requise"),
+  mileage: z.string().refine((val) => {
+    if (!val) return true;
+    const num = parseInt(val);
+    return !isNaN(num) && num >= 0;
+  }, "Kilométrage invalide"),
+  status: z.string(),
+  priority: z.string(),
+  cost: z.string().refine((val) => {
+    if (!val) return true;
+    const num = parseFloat(val);
+    return !isNaN(num) && num >= 0;
+  }, "Coût invalide"),
+  notes: z.string().max(500, "Notes trop longues"),
+});
 
 interface MaintenanceDialogProps {
   open: boolean;
@@ -57,8 +77,9 @@ export const MaintenanceDialog = ({ open, onOpenChange, maintenance, vehicles, o
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.vehicle_id || !formData.type || !formData.date) {
-      toast.error("Veuillez remplir tous les champs obligatoires");
+    const result = maintenanceSchema.safeParse(formData);
+    if (!result.success) {
+      toast.error(result.error.errors[0].message);
       return;
     }
 
