@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DriverDialogProps {
   open: boolean;
@@ -16,6 +17,7 @@ interface DriverDialogProps {
 }
 
 export const DriverDialog = ({ open, onOpenChange, driver, vehicles, onSave }: DriverDialogProps) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -53,10 +55,16 @@ export const DriverDialog = ({ open, onOpenChange, driver, vehicles, onSave }: D
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!user) {
+      toast.error("Vous devez être connecté");
+      return;
+    }
+
     try {
       const dataToSave = {
         ...formData,
         assigned_vehicle_id: formData.assigned_vehicle_id || null,
+        user_id: user.id,
       };
 
       if (driver) {

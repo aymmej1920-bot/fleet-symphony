@@ -7,6 +7,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { z } from "zod";
+import { useAuth } from "@/contexts/AuthContext";
+
+const documentSchema = z.object({
+  vehicle_id: z.string().uuid({ message: "Véhicule requis" }),
+  type: z.string().trim().min(1, { message: "Type requis" }).max(100, { message: "Type trop long" }),
+  expiry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Date d'expiration invalide" }),
+  status: z.enum(["valid", "expiring-soon", "expired"], { message: "Statut invalide" }),
+  document_url: z.string().trim().url({ message: "URL invalide" }).max(500).optional().or(z.literal("")),
+  notes: z.string().trim().max(500, { message: "Notes trop longues (max 500 caractères)" }).optional().or(z.literal("")),
+});
 
 interface DocumentDialogProps {
   open: boolean;
@@ -17,6 +28,7 @@ interface DocumentDialogProps {
 }
 
 export const DocumentDialog = ({ open, onOpenChange, document, vehicles, onSave }: DocumentDialogProps) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     vehicle_id: "",
     type: "",
@@ -51,17 +63,41 @@ export const DocumentDialog = ({ open, onOpenChange, document, vehicles, onSave 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!user) {
+      toast.error("Vous devez être connecté");
+      return;
+    }
+
     try {
+      const validatedData = documentSchema.parse({
+        vehicle_id: formData.vehicle_id,
+        type: formData.type,
+        expiry_date: formData.expiry_date,
+        status: formData.status,
+        document_url: formData.document_url || undefined,
+        notes: formData.notes || undefined,
+      });
+
+      const dataToSave = {
+        vehicle_id: validatedData.vehicle_id,
+        type: validatedData.type,
+        expiry_date: validatedData.expiry_date,
+        status: validatedData.status,
+        document_url: validatedData.document_url || null,
+        notes: validatedData.notes || null,
+        user_id: user.id,
+      };
+
       if (document) {
         const { error } = await supabase
           .from("documents")
-          .update(formData)
+          .update(dataToSave)
           .eq("id", document.id);
 
         if (error) throw error;
         toast.success("Document modifié avec succès");
       } else {
-        const { error } = await supabase.from("documents").insert([formData]);
+        const { error } = await supabase.from("documents").insert([dataToSave]);
 
         if (error) throw error;
         toast.success("Document ajouté avec succès");
@@ -70,7 +106,11 @@ export const DocumentDialog = ({ open, onOpenChange, document, vehicles, onSave 
       onSave();
       onOpenChange(false);
     } catch (error: any) {
-      toast.error(error.message);
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error("Une erreur est survenue");
+      }
     }
   };
 

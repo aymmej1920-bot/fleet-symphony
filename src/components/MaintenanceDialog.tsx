@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
+import { useAuth } from "@/contexts/AuthContext";
 
 const maintenanceSchema = z.object({
   vehicle_id: z.string().min(1, "Véhicule requis"),
@@ -37,6 +38,7 @@ interface MaintenanceDialogProps {
 }
 
 export const MaintenanceDialog = ({ open, onOpenChange, maintenance, vehicles, onSave }: MaintenanceDialogProps) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     vehicle_id: "",
     type: "",
@@ -77,6 +79,11 @@ export const MaintenanceDialog = ({ open, onOpenChange, maintenance, vehicles, o
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!user) {
+      toast.error("Vous devez être connecté");
+      return;
+    }
+    
     const result = maintenanceSchema.safeParse(formData);
     if (!result.success) {
       toast.error(result.error.errors[0].message);
@@ -93,6 +100,7 @@ export const MaintenanceDialog = ({ open, onOpenChange, maintenance, vehicles, o
         priority: formData.priority,
         cost: formData.cost ? parseFloat(formData.cost) : null,
         notes: formData.notes || null,
+        user_id: user.id,
       };
 
       if (maintenance) {

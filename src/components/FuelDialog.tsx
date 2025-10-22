@@ -7,6 +7,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { z } from "zod";
+import { useAuth } from "@/contexts/AuthContext";
+
+const fuelSchema = z.object({
+  vehicle_id: z.string().uuid({ message: "Véhicule requis" }),
+  driver_id: z.string().uuid().optional().or(z.literal("")),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Date invalide" }),
+  mileage: z.number().int().min(0, { message: "Le kilométrage doit être positif" }).max(9999999, { message: "Kilométrage trop élevé" }),
+  liters: z.number().min(0.01, { message: "Les litres doivent être supérieurs à 0" }).max(1000, { message: "Litres trop élevés" }),
+  cost: z.number().min(0, { message: "Le coût doit être positif" }).max(999999, { message: "Coût trop élevé" }),
+  station: z.string().trim().max(100, { message: "Station trop longue" }).optional().or(z.literal("")),
+  consumption: z.number().min(0).max(100).optional().or(z.literal(0)),
+  notes: z.string().trim().max(500, { message: "Notes trop longues (max 500 caractères)" }).optional().or(z.literal("")),
+});
 
 interface FuelDialogProps {
   open: boolean;
@@ -18,6 +32,7 @@ interface FuelDialogProps {
 }
 
 export const FuelDialog = ({ open, onOpenChange, fuelRecord, vehicles, drivers, onSave }: FuelDialogProps) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     vehicle_id: "",
     driver_id: "",
@@ -61,14 +76,35 @@ export const FuelDialog = ({ open, onOpenChange, fuelRecord, vehicles, drivers, 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!user) {
+      toast.error("Vous devez être connecté");
+      return;
+    }
+
     try {
-      const dataToSave = {
-        ...formData,
-        driver_id: formData.driver_id || null,
+      const validatedData = fuelSchema.parse({
+        vehicle_id: formData.vehicle_id,
+        driver_id: formData.driver_id || undefined,
+        date: formData.date,
+        mileage: parseInt(formData.mileage.toString()),
         liters: parseFloat(formData.liters.toString()),
         cost: parseFloat(formData.cost.toString()),
-        mileage: parseInt(formData.mileage.toString()),
-        consumption: formData.consumption ? parseFloat(formData.consumption.toString()) : null,
+        station: formData.station || undefined,
+        consumption: formData.consumption ? parseFloat(formData.consumption.toString()) : undefined,
+        notes: formData.notes || undefined,
+      });
+
+      const dataToSave = {
+        vehicle_id: validatedData.vehicle_id,
+        date: validatedData.date,
+        mileage: validatedData.mileage,
+        liters: validatedData.liters,
+        cost: validatedData.cost,
+        driver_id: validatedData.driver_id || null,
+        station: validatedData.station || null,
+        consumption: validatedData.consumption || null,
+        notes: validatedData.notes || null,
+        user_id: user.id,
       };
 
       if (fuelRecord) {
@@ -89,7 +125,11 @@ export const FuelDialog = ({ open, onOpenChange, fuelRecord, vehicles, drivers, 
       onSave();
       onOpenChange(false);
     } catch (error: any) {
-      toast.error(error.message);
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error("Une erreur est survenue");
+      }
     }
   };
 

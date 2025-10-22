@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
+import { useAuth } from "@/contexts/AuthContext";
 
 const vehicleSchema = z.object({
   brand: z.string().trim().min(1, "Marque requise").max(50, "Marque trop longue"),
@@ -27,6 +28,7 @@ interface VehicleDialogProps {
 }
 
 export const VehicleDialog = ({ open, onOpenChange, vehicle, onSave }: VehicleDialogProps) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     brand: "",
     model: "",
@@ -67,6 +69,11 @@ export const VehicleDialog = ({ open, onOpenChange, vehicle, onSave }: VehicleDi
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!user) {
+      toast.error("Vous devez être connecté");
+      return;
+    }
+    
     const result = vehicleSchema.safeParse(formData);
     if (!result.success) {
       toast.error(result.error.errors[0].message);
@@ -74,16 +81,18 @@ export const VehicleDialog = ({ open, onOpenChange, vehicle, onSave }: VehicleDi
     }
     
     try {
+      const dataToSave = { ...formData, user_id: user.id };
+      
       if (vehicle) {
         const { error } = await supabase
           .from("vehicles")
-          .update(formData)
+          .update(dataToSave)
           .eq("id", vehicle.id);
 
         if (error) throw error;
         toast.success("Véhicule modifié avec succès");
       } else {
-        const { error } = await supabase.from("vehicles").insert([formData]);
+        const { error } = await supabase.from("vehicles").insert([dataToSave]);
 
         if (error) throw error;
         toast.success("Véhicule ajouté avec succès");

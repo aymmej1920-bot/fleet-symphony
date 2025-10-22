@@ -7,6 +7,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { z } from "zod";
+import { useAuth } from "@/contexts/AuthContext";
+
+const inspectionSchema = z.object({
+  vehicle_id: z.string().uuid({ message: "Véhicule requis" }),
+  type: z.string().trim().min(1, { message: "Type requis" }).max(100, { message: "Type trop long" }),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Date invalide" }),
+  inspector: z.string().trim().min(1, { message: "Inspecteur requis" }).max(100, { message: "Nom de l'inspecteur trop long" }),
+  status: z.enum(["pending", "passed", "passed-with-warnings", "failed"], { message: "Statut invalide" }),
+  score: z.number().int().min(0, { message: "Score doit être positif" }).max(100, { message: "Score maximum 100" }).optional().or(z.literal(0)),
+  issues_found: z.number().int().min(0, { message: "Nombre d'anomalies invalide" }).max(1000),
+  notes: z.string().trim().max(1000, { message: "Notes trop longues (max 1000 caractères)" }).optional().or(z.literal("")),
+});
 
 interface InspectionDialogProps {
   open: boolean;
@@ -17,6 +30,7 @@ interface InspectionDialogProps {
 }
 
 export const InspectionDialog = ({ open, onOpenChange, inspection, vehicles, onSave }: InspectionDialogProps) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     vehicle_id: "",
     type: "",
@@ -57,11 +71,33 @@ export const InspectionDialog = ({ open, onOpenChange, inspection, vehicles, onS
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!user) {
+      toast.error("Vous devez être connecté");
+      return;
+    }
+
     try {
-      const dataToSave = {
-        ...formData,
-        score: formData.score ? parseInt(formData.score.toString()) : null,
+      const validatedData = inspectionSchema.parse({
+        vehicle_id: formData.vehicle_id,
+        type: formData.type,
+        date: formData.date,
+        inspector: formData.inspector,
+        status: formData.status,
+        score: formData.score ? parseInt(formData.score.toString()) : undefined,
         issues_found: parseInt(formData.issues_found.toString()),
+        notes: formData.notes || undefined,
+      });
+
+      const dataToSave = {
+        vehicle_id: validatedData.vehicle_id,
+        type: validatedData.type,
+        date: validatedData.date,
+        inspector: validatedData.inspector,
+        status: validatedData.status,
+        issues_found: validatedData.issues_found,
+        score: validatedData.score || null,
+        notes: validatedData.notes || null,
+        user_id: user.id,
       };
 
       if (inspection) {
@@ -82,7 +118,11 @@ export const InspectionDialog = ({ open, onOpenChange, inspection, vehicles, onS
       onSave();
       onOpenChange(false);
     } catch (error: any) {
-      toast.error(error.message);
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error("Une erreur est survenue");
+      }
     }
   };
 

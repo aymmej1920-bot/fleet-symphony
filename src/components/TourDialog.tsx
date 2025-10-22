@@ -6,6 +6,20 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { z } from "zod";
+import { useAuth } from "@/contexts/AuthContext";
+
+const tourSchema = z.object({
+  name: z.string().trim().min(1, { message: "Nom requis" }).max(200, { message: "Nom trop long" }),
+  vehicle_id: z.string().uuid().optional().or(z.literal("")),
+  driver_id: z.string().uuid().optional().or(z.literal("")),
+  status: z.enum(["scheduled", "in-progress", "completed"], { message: "Statut invalide" }),
+  start_time: z.string().optional().or(z.literal("")),
+  end_time: z.string().optional().or(z.literal("")),
+  total_stops: z.number().int().min(0, { message: "Nombre d'arrêts invalide" }).max(1000),
+  completed_stops: z.number().int().min(0, { message: "Arrêts terminés invalide" }).max(1000),
+  distance_km: z.number().min(0).max(99999).optional().or(z.literal(0)),
+});
 
 interface TourDialogProps {
   open: boolean;
@@ -17,6 +31,7 @@ interface TourDialogProps {
 }
 
 export const TourDialog = ({ open, onOpenChange, tour, vehicles, drivers, onSave }: TourDialogProps) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     vehicle_id: "",
@@ -60,14 +75,35 @@ export const TourDialog = ({ open, onOpenChange, tour, vehicles, drivers, onSave
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!user) {
+      toast.error("Vous devez être connecté");
+      return;
+    }
+
     try {
+      const validatedData = tourSchema.parse({
+        name: formData.name,
+        vehicle_id: formData.vehicle_id || undefined,
+        driver_id: formData.driver_id || undefined,
+        status: formData.status,
+        start_time: formData.start_time || undefined,
+        end_time: formData.end_time || undefined,
+        total_stops: parseInt(formData.total_stops.toString()),
+        completed_stops: parseInt(formData.completed_stops.toString()),
+        distance_km: formData.distance_km ? parseFloat(formData.distance_km.toString()) : undefined,
+      });
+
       const dataToSave = {
-        ...formData,
-        vehicle_id: formData.vehicle_id || null,
-        driver_id: formData.driver_id || null,
-        start_time: formData.start_time || null,
-        end_time: formData.end_time || null,
-        distance_km: formData.distance_km ? parseFloat(formData.distance_km.toString()) : null,
+        name: validatedData.name,
+        status: validatedData.status,
+        total_stops: validatedData.total_stops,
+        completed_stops: validatedData.completed_stops,
+        vehicle_id: validatedData.vehicle_id || null,
+        driver_id: validatedData.driver_id || null,
+        start_time: validatedData.start_time || null,
+        end_time: validatedData.end_time || null,
+        distance_km: validatedData.distance_km || null,
+        user_id: user.id,
       };
 
       if (tour) {
@@ -88,7 +124,11 @@ export const TourDialog = ({ open, onOpenChange, tour, vehicles, drivers, onSave
       onSave();
       onOpenChange(false);
     } catch (error: any) {
-      toast.error(error.message);
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error("Une erreur est survenue");
+      }
     }
   };
 

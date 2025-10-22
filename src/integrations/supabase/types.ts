@@ -24,6 +24,7 @@ export type Database = {
           status: string
           type: string
           updated_at: string | null
+          user_id: string | null
           vehicle_id: string
         }
         Insert: {
@@ -35,6 +36,7 @@ export type Database = {
           status?: string
           type: string
           updated_at?: string | null
+          user_id?: string | null
           vehicle_id: string
         }
         Update: {
@@ -46,6 +48,7 @@ export type Database = {
           status?: string
           type?: string
           updated_at?: string | null
+          user_id?: string | null
           vehicle_id?: string
         }
         Relationships: [
@@ -72,6 +75,7 @@ export type Database = {
           status: string
           total_trips: number | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           assigned_vehicle_id?: string | null
@@ -86,6 +90,7 @@ export type Database = {
           status?: string
           total_trips?: number | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           assigned_vehicle_id?: string | null
@@ -100,6 +105,7 @@ export type Database = {
           status?: string
           total_trips?: number | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -124,6 +130,7 @@ export type Database = {
           notes: string | null
           station: string | null
           updated_at: string | null
+          user_id: string | null
           vehicle_id: string
         }
         Insert: {
@@ -138,6 +145,7 @@ export type Database = {
           notes?: string | null
           station?: string | null
           updated_at?: string | null
+          user_id?: string | null
           vehicle_id: string
         }
         Update: {
@@ -152,6 +160,7 @@ export type Database = {
           notes?: string | null
           station?: string | null
           updated_at?: string | null
+          user_id?: string | null
           vehicle_id?: string
         }
         Relationships: [
@@ -183,6 +192,7 @@ export type Database = {
           status: string
           type: string
           updated_at: string | null
+          user_id: string | null
           vehicle_id: string
         }
         Insert: {
@@ -196,6 +206,7 @@ export type Database = {
           status?: string
           type: string
           updated_at?: string | null
+          user_id?: string | null
           vehicle_id: string
         }
         Update: {
@@ -209,6 +220,7 @@ export type Database = {
           status?: string
           type?: string
           updated_at?: string | null
+          user_id?: string | null
           vehicle_id?: string
         }
         Relationships: [
@@ -233,6 +245,7 @@ export type Database = {
           status: string
           type: string
           updated_at: string | null
+          user_id: string | null
           vehicle_id: string
         }
         Insert: {
@@ -246,6 +259,7 @@ export type Database = {
           status?: string
           type: string
           updated_at?: string | null
+          user_id?: string | null
           vehicle_id: string
         }
         Update: {
@@ -259,6 +273,7 @@ export type Database = {
           status?: string
           type?: string
           updated_at?: string | null
+          user_id?: string | null
           vehicle_id?: string
         }
         Relationships: [
@@ -284,6 +299,7 @@ export type Database = {
           status: string
           total_stops: number | null
           updated_at: string | null
+          user_id: string | null
           vehicle_id: string | null
         }
         Insert: {
@@ -298,6 +314,7 @@ export type Database = {
           status?: string
           total_stops?: number | null
           updated_at?: string | null
+          user_id?: string | null
           vehicle_id?: string | null
         }
         Update: {
@@ -312,6 +329,7 @@ export type Database = {
           status?: string
           total_stops?: number | null
           updated_at?: string | null
+          user_id?: string | null
           vehicle_id?: string | null
         }
         Relationships: [
@@ -343,6 +361,7 @@ export type Database = {
           plate: string
           status: string
           updated_at: string | null
+          user_id: string | null
           year: number | null
         }
         Insert: {
@@ -356,6 +375,7 @@ export type Database = {
           plate: string
           status?: string
           updated_at?: string | null
+          user_id?: string | null
           year?: number | null
         }
         Update: {
@@ -369,6 +389,7 @@ export type Database = {
           plate?: string
           status?: string
           updated_at?: string | null
+          user_id?: string | null
           year?: number | null
         }
         Relationships: []
